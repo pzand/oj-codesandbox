@@ -1,6 +1,0 @@
-docker:
-  host: tcp://118.178.138.114:5555
-  javaContains: java_codesandbox_04
-spring:
-  config:
-    name: dev

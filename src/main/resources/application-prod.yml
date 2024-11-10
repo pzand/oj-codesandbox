@@ -1,0 +1,6 @@
+docker:
+  host: tcp://localhost:5555
+  javaImageName: java_codesandbox
+spring:
+  config:
+    name: prod
