@@ -37,22 +37,24 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             File userCodeFile = saveCode2File(code);
 
             // 2）编译执行用户代码
+            log.debug("开始编译代码");
             ExecuteMessage compileMessage = compileFile(userCodeFile);
-//            System.out.println(compileMessage);
 
             // 3）执行代码
+            log.debug("开始执行代码");
             List<ExecuteMessage> executeMessageList = runFile(userCodeFile, inputList);
 
             // 4）整理输出结果
+            log.debug("整理输出结果");
             ExecuteCodeResponse outputResponse = getOutputResponse(executeMessageList);
 
             // 5）删除文件
+            log.debug("删除用户代码文件");
             boolean b = deleteFile(userCodeFile);
             if (!b) {
                 log.error("删除文件失败: " + userCodeFile.getAbsolutePath());
             }
             return outputResponse;
-
         } catch (Exception e) {
             return getErrorResponse(e);
         }
@@ -70,10 +72,11 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         if (!FileUtil.exist(codePathName)) {
             FileUtil.mkdir(codePathName);
         }
-        System.out.println("代码保存路径: " + codePathName);
+        log.debug("代码保存路径: " + codePathName);
 
         String userCodeParentPathName = codePathName + File.separator + UUID.randomUUID();
         String userCodePath = userCodeParentPathName + File.separator;
+        log.debug("用户代码路径: " + userCodePath + GLOBAL_JAVA_CLASS_NAME);
         return FileUtil.writeString(code, userCodePath + GLOBAL_JAVA_CLASS_NAME, StandardCharsets.UTF_8);
     }
 
@@ -83,7 +86,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
      * @return
      */
     public ExecuteMessage compileFile(File userCodeFile) {
-        System.out.println(userCodeFile.exists());
+        log.debug("用户代码是否存在：" + userCodeFile.exists());
         try {
             String cmdCompile = String.format("javac %s", userCodeFile.getAbsolutePath());
             ExecuteMessage compileMessage = ProcessUtils.runCommand(cmdCompile, "编译");

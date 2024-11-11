@@ -12,6 +12,7 @@ import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.ExecCreateCmdResponse;
 import com.github.dockerjava.api.model.*;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.scheduling.annotation.Async;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
 
 @Component
 @Primary
+@Slf4j
 public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
     @Value("${docker.javaContains}")
     private String CONTAINER_NAME;
@@ -46,14 +48,16 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
         if (containers == null || containers.size() == 0) {
+            log.debug("获取docker容器");
             getContainer();
         }
         if (containers.size() == 0) {
+            log.error("不存在执行机");
             throw new RuntimeException("没有执行机");
         }
         container = containers.get(new Random().nextInt(containers.size()));
         CODE_HOME = "/www/wwwroot/code" + container.getNames()[0];
-
+        log.debug("执行机id: " + container.getId());
         // 指定这次的执行机
         return super.executeCode(executeCodeRequest);
     }
@@ -124,12 +128,13 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         }
 
         List<ChangeLog> newChangeLogs = dockerClient.containerDiffCmd(containerId).exec();
-//        checkNotChange(oldChangeLogs, newChangeLogs, container);
+        checkNotChange(oldChangeLogs, newChangeLogs, container);
 
         return executeMessageList;
     }
 
     private void getContainer() {
+        log.debug("获取容器列表");
         Pattern compile = Pattern.compile("^/" + CONTAINER_NAME + ".*");
 
         List<Container> exec = dockerClient.listContainersCmd().exec();
@@ -145,18 +150,25 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
 
     /**
      * 判断此容器前后状态是否一致，否则删除重建容器
+     *
      * @param oldChangeLogs
      * @param newChangeLogs
      * @param container
      */
     @Async
     void checkNotChange(List<ChangeLog> oldChangeLogs, List<ChangeLog> newChangeLogs, Container container) {
-        if (oldChangeLogs == null || newChangeLogs == null) {
+        if (oldChangeLogs == newChangeLogs) {
             return;
         }
-        Set<String> oldPath = oldChangeLogs.stream().map(ChangeLog::getPath).collect(Collectors.toSet());
-        Set<String> newPath = newChangeLogs.stream().map(ChangeLog::getPath).collect(Collectors.toSet());
-        if (!oldPath.equals(newPath)) {
+
+        boolean res = (oldChangeLogs == null || newChangeLogs == null);
+        if (oldChangeLogs != null && newChangeLogs != null) {
+            Set<String> oldPath = oldChangeLogs.stream().map(ChangeLog::getPath).collect(Collectors.toSet());
+            Set<String> newPath = newChangeLogs.stream().map(ChangeLog::getPath).collect(Collectors.toSet());
+            res = !oldPath.equals(newPath);
+        }
+        if (res) {
+            log.debug("删除原始容器");
             // 移除就容器
             dockerClient.stopContainerCmd(container.getId()).exec();
             dockerClient.removeContainerCmd(container.getId()).exec();
@@ -166,6 +178,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
             hostConfig.withCpuCount(1L);
             hostConfig.withMemory(200L * 1000 * 1000);
             hostConfig.withDiskQuota(1000L * 1000 * 1000);
+            hostConfig.withRestartPolicy(RestartPolicy.onFailureRestart(5));
             CreateContainerResponse response = dockerClient.createContainerCmd(CONTAINER_NAME)
                     .withCmd("bash")
                     .withTty(true)
@@ -176,7 +189,11 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                     .withNetworkDisabled(true)
                     .withHostConfig(hostConfig)
                     .exec();
+            log.debug("正在创建新的容器");
             dockerClient.startContainerCmd(response.getId()).exec();
+            log.debug("创建新的容器成功");
+
+            containers = null;
         }
     }
 }

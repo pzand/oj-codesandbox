@@ -1,6 +1,6 @@
 docker:
-  host: tcp://localhost:5555
+  host: tcp://118.178.138.114:5555
   javaContains: java_codesandbox
 spring:
   config:
-    name: prod
+    name: dev

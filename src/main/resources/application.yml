@@ -4,4 +4,7 @@ spring:
   config:
     name: codeSandbox
   profiles:
-    active: dev
+    active: prod
+logging:
+  level:
+    com.example.codesandbox.*: debug
